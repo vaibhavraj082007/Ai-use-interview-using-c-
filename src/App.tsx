@@ -35,7 +35,7 @@ import Weights from '@/pages/admin/Weights'
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/Ai-use-interview-using-c-">
       <Routes>
         {/* ── Candidate routes (top navbar layout) ────────── */}
         <Route element={<CandidateLayout />}>
