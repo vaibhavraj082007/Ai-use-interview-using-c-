@@ -1,23 +1,36 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Users,
   BarChart3,
   Settings,
+  SlidersHorizontal,
   Sparkles,
   ChevronLeft,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { useAuth } from '@/features/auth/auth-context'
 
 const sidebarLinks = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/candidates', label: 'Candidates', icon: Users, end: false },
   { to: '/admin/reports', label: 'Reports', icon: BarChart3, end: false },
+  { to: '/admin/users', label: 'Users', icon: Users, end: false },
+  { to: '/admin/weights', label: 'Weights', icon: SlidersHorizontal, end: false },
   { to: '/admin/settings', label: 'Settings', icon: Settings, end: false },
 ]
 
 export default function AdminLayout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
+
+  async function handleSignOut() {
+    await logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="min-h-screen bg-surface flex">
@@ -83,10 +96,23 @@ export default function AdminLayout() {
             )?.label ?? 'Admin'}
           </h1>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-foreground-subtle">Admin User</span>
+            <ThemeToggle />
+            <span className="text-xs text-foreground-subtle">
+              {user?.name ?? 'Admin'}
+            </span>
             <div className="h-7 w-7 rounded-full bg-accent-light flex items-center justify-center">
-              <span className="text-xs font-semibold text-accent">A</span>
+              <span className="text-xs font-semibold text-accent">
+                {(user?.name ?? 'A').charAt(0).toUpperCase()}
+              </span>
             </div>
+            <button
+              onClick={handleSignOut}
+              className="text-foreground-subtle hover:text-foreground p-1.5 rounded-[var(--radius-sm)] transition-colors duration-150 cursor-pointer"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </header>
 

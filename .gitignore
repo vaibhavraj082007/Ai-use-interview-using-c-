@@ -12,6 +12,15 @@ dist
 dist-ssr
 *.local
 
+# Backend (server/)
+.env
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+server/prisma/dev.db
+server/dist
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

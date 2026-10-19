@@ -1,0 +1,101 @@
+import { Router } from 'express'
+import { z } from 'zod'
+import { requireAuth } from '../auth/middleware.js'
+import { httpError } from '../lib/http-error.js'
+import { gradeInterview, generateQuestions } from '../interview/index.js'
+import { prisma } from '../db.js'
+import type { Difficulty, QuestionType } from '../interview/provider.js'
+
+const router = Router()
+
+/* ── Request validation ───────────────────────────────────────── */
+
+const GenerateBodySchema = z.object({
+  cvText: z.string().max(50_000).optional().default(''),
+  role: z.string().trim().min(1, 'role is required').max(60),
+  skills: z.array(z.string().trim().min(1).max(60)).max(40).optional().default([]),
+  difficulty: z.enum(['Easy', 'Medium', 'Hard']).optional().default('Medium'),
+  count: z.number().int().min(1).max(20).optional().default(8),
+})
+
+const GradeQuestionSchema = z.object({
+  id: z.string().trim().min(1),
+  text: z.string().trim().min(1),
+  skill: z.string().trim().min(1),
+  topic: z.string().trim().min(1),
+  type: z.enum(['coding', 'conceptual', 'oral']),
+  difficulty: z.enum(['Easy', 'Medium', 'Hard']),
+})
+
+const GradeAnswerSchema = z.object({
+  questionId: z.string().trim().min(1),
+  answer: z.string(),
+})
+
+const GradeBodySchema = z.object({
+  role: z.string().trim().max(60).optional().default('Interview'),
+  questions: z.array(GradeQuestionSchema).min(1).max(40),
+  answers: z.array(GradeAnswerSchema).max(40).optional().default([]),
+})
+
+function formatZod(err: z.ZodError): string {
+  return err.issues
+    .map((i) => (i.path.length > 0 ? `${i.path.join('.')}: ${i.message}` : i.message))
+    .join(' ')
+}
+
+/* ── POST /api/interview/generate ─────────────────────────────── */
+
+router.post('/generate', requireAuth, async (req, res, next) => {
+  try {
+    const parsed = GenerateBodySchema.safeParse(req.body)
+    if (!parsed.success) throw httpError.badRequest(formatZod(parsed.error))
+
+    const { questions, provider } = await generateQuestions(parsed.data)
+
+    res.json({
+      mode: provider.mode,
+      provider: provider.name,
+      questions,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/* ── POST /api/interview/grade ─────────────────────────────────── */
+
+router.post('/grade', requireAuth, async (req, res, next) => {
+  try {
+    const parsed = GradeBodySchema.safeParse(req.body)
+    if (!parsed.success) throw httpError.badRequest(formatZod(parsed.error))
+
+    const { questions, answers } = parsed.data
+
+    const { result, provider } = await gradeInterview({
+      role: parsed.data.role,
+      questions: questions.map((q) => ({
+        id: q.id,
+        text: q.text,
+        skill: q.skill,
+        topic: q.topic,
+        type: q.type as QuestionType,
+        difficulty: q.difficulty as Difficulty,
+      })),
+      answers: answers.map((a) => ({
+        questionId: a.questionId,
+        answer: a.answer,
+      })),
+    })
+
+    res.json({
+      mode: provider.mode,
+      provider: provider.name,
+      result,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+export { router as interviewRouter }

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -10,8 +10,9 @@ import {
   CardContent,
   CardFooter,
 } from '@/components/ui/card'
-
-/* ── tiny helpers ──────────────────────────────────────────────── */
+import { useAuth } from '@/features/auth/auth-context'
+import { AuthError } from '@/features/auth/errors'
+import type { NavigationState } from '@/features/auth/route-guards'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -21,21 +22,57 @@ interface FieldErrors {
   password?: string
 }
 
-function validate(name: string, email: string, password: string): FieldErrors {
+function validate(
+  name: string,
+  email: string,
+  password: string
+): FieldErrors {
   const errors: FieldErrors = {}
-  if (!name.trim()) errors.name = 'Name is required.'
-  if (!email.trim()) errors.email = 'Email is required.'
-  else if (!EMAIL_RE.test(email)) errors.email = 'Enter a valid email address.'
-  if (!password) errors.password = 'Password is required.'
-  else if (password.length < 8)
-    errors.password = 'Must be at least 8 characters.'
+
+  if (!name.trim()) {
+    errors.name = 'Please enter your full name.'
+  } else if (name.trim().length < 2) {
+    errors.name = 'Name must be at least 2 characters.'
+  }
+
+  if (!email.trim()) {
+    errors.email = 'Please enter your email address.'
+  } else if (!EMAIL_RE.test(email.trim())) {
+    errors.email = AuthError.emailInvalid
+  }
+
+  if (!password) {
+    errors.password = 'Please choose a password.'
+  } else if (password.length < 8) {
+    errors.password = AuthError.passwordShort
+  }
+
   return errors
 }
 
-/* ── component ─────────────────────────────────────────────────── */
+function passwordScore(password: string): number {
+  let score = 0
+  if (password.length >= 8) score++
+  if (password.length >= 12) score++
+  if (/\d/.test(password)) score++
+  if (/[^A-Za-z0-9]/.test(password)) score++
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++
+  return score
+}
+
+const STRENGTH_LABELS = ['Too short', 'Weak', 'Fair', 'Good', 'Strong']
+const STRENGTH_COLORS = [
+  'bg-border',
+  'bg-error',
+  'bg-warning',
+  'bg-success',
+  'bg-success',
+]
 
 export default function Register() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const { register } = useAuth()
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -45,7 +82,16 @@ export default function Register() {
   const [formError, setFormError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e: FormEvent) {
+  const score = passwordScore(password)
+  const showStrength = password.length > 0
+  const intended =
+    (location.state as NavigationState | null)?.from?.pathname ?? '/upload-cv'
+
+  function clearFieldError(field: keyof FieldErrors) {
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
+  }
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError('')
 
@@ -54,30 +100,13 @@ export default function Register() {
     if (Object.keys(fieldErrors).length > 0) return
 
     setLoading(true)
-
-    // Simulate a tiny network delay so the UI feels real
-    setTimeout(() => {
-      // Check for duplicate email
-      const existing = localStorage.getItem('interviewly_users')
-      const users: Record<string, { name: string; password: string }> =
-        existing ? JSON.parse(existing) : {}
-
-      if (users[email]) {
-        setFormError('An account with this email already exists.')
-        setLoading(false)
-        return
-      }
-
-      // Persist
-      users[email] = { name: name.trim(), password }
-      localStorage.setItem('interviewly_users', JSON.stringify(users))
-      localStorage.setItem(
-        'interviewly_session',
-        JSON.stringify({ email, name: name.trim() })
-      )
-
-      navigate('/upload-cv')
-    }, 400)
+    try {
+      await register({ name, email, password })
+      navigate(intended, { replace: true })
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : AuthError.emailTaken)
+      setLoading(false)
+    }
   }
 
   return (
@@ -92,11 +121,27 @@ export default function Register() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {/* ── form-level error ─────────────────────────────── */}
             {formError && (
-              <div className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-error/5 border border-error/20 px-3.5 py-2.5 text-sm text-error animate-fade-in">
-                <span className="shrink-0 mt-0.5">⚠</span>
-                <span>{formError}</span>
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-error-soft border border-error/20 px-3.5 py-2.5 text-sm text-error animate-fade-in"
+              >
+                <span className="shrink-0 mt-0.5" aria-hidden="true">
+                  ⚠
+                </span>
+                <div className="flex-1">
+                  <span>{formError}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormError('')
+                      setPassword('')
+                    }}
+                    className="block mt-1 text-xs font-medium underline underline-offset-2 hover:no-underline cursor-pointer"
+                  >
+                    Try again
+                  </button>
+                </div>
               </div>
             )}
 
@@ -107,7 +152,7 @@ export default function Register() {
               value={name}
               onChange={(e) => {
                 setName(e.target.value)
-                if (errors.name) setErrors((p) => ({ ...p, name: undefined }))
+                clearFieldError('name')
               }}
               error={errors.name}
               autoComplete="name"
@@ -121,26 +166,48 @@ export default function Register() {
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value)
-                if (errors.email) setErrors((p) => ({ ...p, email: undefined }))
+                clearFieldError('email')
               }}
               error={errors.email}
               autoComplete="email"
             />
 
-            <Input
-              id="register-password"
-              label="Password"
-              type="password"
-              placeholder="At least 8 characters"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value)
-                if (errors.password)
-                  setErrors((p) => ({ ...p, password: undefined }))
-              }}
-              error={errors.password}
-              autoComplete="new-password"
-            />
+            <div className="space-y-2">
+              <Input
+                id="register-password"
+                label="Password"
+                type="password"
+                placeholder="At least 8 characters"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  clearFieldError('password')
+                }}
+                error={errors.password}
+                hint="Use 8+ characters with a mix of cases, numbers & symbols."
+                autoComplete="new-password"
+              />
+
+              {showStrength && !errors.password && (
+                <div className="flex items-center gap-2.5 animate-fade-in">
+                  <div className="flex-1 flex gap-1">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
+                          i < score
+                            ? STRENGTH_COLORS[Math.min(score, 4)]
+                            : 'bg-border'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-[11px] font-medium text-foreground-muted w-14 text-right">
+                    {STRENGTH_LABELS[Math.min(score, 4)]}
+                  </span>
+                </div>
+              )}
+            </div>
 
             <Button
               id="register-submit"
@@ -148,7 +215,7 @@ export default function Register() {
               className="w-full"
               disabled={loading}
             >
-              {loading ? 'Creating…' : 'Create Account'}
+              {loading ? 'Creating account…' : 'Create Account'}
             </Button>
           </CardContent>
 
@@ -157,6 +224,11 @@ export default function Register() {
               Already have an account?{' '}
               <NavLink
                 to="/login"
+                state={
+                  (location.state as NavigationState | null)?.from
+                    ? { from: (location.state as NavigationState).from }
+                    : undefined
+                }
                 className="text-accent hover:text-accent-hover font-medium"
               >
                 Sign in

@@ -1,22 +1,27 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { Sparkles, FileText, ArrowRight, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { detectSkillsRemote } from '@/lib/api'
 
-/* ── simulated skill detection per role ────────────────────────── */
+/* ── fallback skill labels per role ────────────────────────────── */
 
-const SKILL_MAP: Record<string, string[]> = {
+// Only used when the detection API is unreachable — the real source of
+// truth is the server, which reads the CV and filters skills to the role.
+const ROLE_FALLBACK_SKILLS: Record<string, string[]> = {
   Frontend: ['React', 'TypeScript', 'CSS', 'HTML', 'Accessibility', 'Webpack', 'Testing'],
   Backend: ['Node.js', 'REST APIs', 'SQL', 'Auth', 'Caching', 'Docker', 'Testing'],
   Data: ['Python', 'SQL', 'Pandas', 'Statistics', 'ML Basics', 'Data Viz', 'ETL'],
   'Full Stack': ['React', 'Node.js', 'TypeScript', 'SQL', 'REST APIs', 'Docker', 'CI/CD'],
 }
 
+// Every interview runs 10 questions: 8 written (coding/conceptual) + 2 oral
+// (spoken answers graded on duration, confidence and correctness).
 const QUESTION_COUNT: Record<string, number> = {
-  Easy: 8,
-  Medium: 12,
-  Hard: 15,
+  Easy: 10,
+  Medium: 10,
+  Hard: 10,
 }
 
 type Phase = 'reviewing' | 'ready' | 'deferred'
@@ -25,23 +30,6 @@ type Phase = 'reviewing' | 'ready' | 'deferred'
 
 export default function Setup() {
   const navigate = useNavigate()
-
-  // Read what UploadCV persisted
-  const stored = localStorage.getItem('interviewly_cv')
-  const cvData = stored
-    ? (JSON.parse(stored) as {
-        fileName: string
-        fileSize: number
-        role: string
-        difficulty: string
-      })
-    : null
-
-  const role = cvData?.role ?? 'Frontend'
-  const difficulty = cvData?.difficulty ?? 'Medium'
-  const fileName = cvData?.fileName ?? 'resume.pdf'
-  const skills = SKILL_MAP[role] ?? SKILL_MAP['Frontend']
-  const questionCount = QUESTION_COUNT[difficulty] ?? 12
 
   /* ── phase state machine ─────────────────────────────────────── */
 
@@ -71,6 +59,74 @@ export default function Setup() {
       clearTimeout(timeout)
     }
   }, [phase])
+
+  /* ── CV skill detection (server reads the CV, filtered by role) ─ */
+
+  const [detectedSkills, setDetectedSkills] = useState<string[]>([])
+
+  useEffect(() => {
+    const raw = localStorage.getItem('interviewly_cv')
+    if (!raw) return
+    let data: { text?: string; role?: string } | null = null
+    try {
+      data = JSON.parse(raw)
+    } catch {
+      data = null
+    }
+    if (!data?.role) return
+
+    let cancelled = false
+    detectSkillsRemote({ cvText: data.text ?? '', role: data.role })
+      .then((res) => {
+        if (!cancelled) setDetectedSkills(res.skills)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDetectedSkills(
+            ROLE_FALLBACK_SKILLS[data!.role!] ?? ROLE_FALLBACK_SKILLS['Frontend']!
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  /* ── CV requirement (checked after hooks) ────────────────────── */
+
+  // Read what UploadCV persisted (corrupt / missing data → no CV yet)
+  const stored = localStorage.getItem('interviewly_cv')
+  let cvData: {
+    fileName: string
+    fileSize: number
+    role: string
+    difficulty: string
+  } | null = null
+  if (stored) {
+    try {
+      cvData = JSON.parse(stored)
+    } catch {
+      cvData = null
+    }
+  }
+
+  // A CV is required before the interview can be configured.
+  if (!cvData || !cvData.fileName || !cvData.role) {
+    return (
+      <Navigate to="/upload-cv" replace state={{ reason: 'cv-required' }} />
+    )
+  }
+
+  const role = cvData.role
+  const difficulty = cvData.difficulty ?? 'Medium'
+  const fileName = cvData.fileName
+  const questionCount = QUESTION_COUNT[difficulty] ?? 10
+  // Skills the server found in the CV, filtered to the chosen role's domain
+  // (falls back to the role's own skill set while the request is in flight).
+  const skills =
+    detectedSkills.length > 0
+      ? detectedSkills
+      : ROLE_FALLBACK_SKILLS[role] ?? []
 
   /* ── handlers ────────────────────────────────────────────────── */
 

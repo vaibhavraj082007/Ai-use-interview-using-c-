@@ -11,7 +11,11 @@ export interface InputProps
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, label, error, hint, id, ...props }, ref) => {
-    const inputId = id ?? React.useId()
+    const generatedId = React.useId()
+    const inputId = id ?? generatedId
+    const hintId = `${inputId}-hint`
+    const errorId = `${inputId}-error`
+    const message = error ?? hint
 
     return (
       <div className="flex flex-col gap-1.5">
@@ -26,6 +30,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           type={type}
           id={inputId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={message ? (error ? errorId : hintId) : undefined}
           className={cn(
             'flex h-10 w-full',
             'bg-surface-raised text-foreground',
@@ -35,17 +41,26 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             'transition-colors duration-150',
             'focus-visible:outline-none focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent/30',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            error && 'border-error focus-visible:border-error focus-visible:ring-error/30',
+            error &&
+              'border-error focus-visible:border-error focus-visible:ring-error/30',
             className
           )}
           ref={ref}
           {...props}
         />
         {hint && !error && (
-          <p className="text-xs text-foreground-subtle">{hint}</p>
+          <p id={hintId} className="text-xs text-foreground-subtle">
+            {hint}
+          </p>
         )}
         {error && (
-          <p className="text-xs text-error">{error}</p>
+          <p
+            id={errorId}
+            role="alert"
+            className="text-xs text-error animate-fade-in"
+          >
+            {error}
+          </p>
         )}
       </div>
     )

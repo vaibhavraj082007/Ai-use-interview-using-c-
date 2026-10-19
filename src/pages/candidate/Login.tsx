@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -10,10 +10,13 @@ import {
   CardContent,
   CardFooter,
 } from '@/components/ui/card'
-
-/* ── tiny helpers ──────────────────────────────────────────────── */
+import { useAuth } from '@/features/auth/auth-context'
+import { AuthError } from '@/features/auth/errors'
+import type { NavigationState } from '@/features/auth/route-guards'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const DEMO_ADMIN = { email: 'admin@interviewly.ai', password: 'admin1234' }
 
 interface FieldErrors {
   email?: string
@@ -22,25 +25,39 @@ interface FieldErrors {
 
 function validate(email: string, password: string): FieldErrors {
   const errors: FieldErrors = {}
-  if (!email.trim()) errors.email = 'Email is required.'
-  else if (!EMAIL_RE.test(email)) errors.email = 'Enter a valid email address.'
-  if (!password) errors.password = 'Password is required.'
+
+  if (!email.trim()) {
+    errors.email = 'Please enter your email address.'
+  } else if (!EMAIL_RE.test(email.trim())) {
+    errors.email = AuthError.emailInvalid
+  }
+
+  if (!password) {
+    errors.password = 'Please enter your password.'
+  }
+
   return errors
 }
 
-/* ── component ─────────────────────────────────────────────────── */
-
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const { login } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-
   const [errors, setErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e: FormEvent) {
+  const intended =
+    (location.state as NavigationState | null)?.from?.pathname ?? '/upload-cv'
+
+  function clearFieldError(field: keyof FieldErrors) {
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
+  }
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError('')
 
@@ -49,31 +66,23 @@ export default function Login() {
     if (Object.keys(fieldErrors).length > 0) return
 
     setLoading(true)
-
-    // Simulate a tiny network delay
-    setTimeout(() => {
-      const existing = localStorage.getItem('interviewly_users')
-      const users: Record<string, { name: string; password: string }> =
-        existing ? JSON.parse(existing) : {}
-
-      const user = users[email]
-
-      if (!user || user.password !== password) {
-        setFormError(
-          'Invalid email or password. Please check your credentials and try again.'
-        )
-        setLoading(false)
-        return
-      }
-
-      // Persist session
-      localStorage.setItem(
-        'interviewly_session',
-        JSON.stringify({ email, name: user.name })
+    try {
+      const user = await login(email, password)
+      navigate(user.role === 'admin' ? '/admin' : intended, { replace: true })
+    } catch (err) {
+      setFormError(
+        err instanceof Error ? err.message : AuthError.invalidCredentials
       )
+      setPassword('')
+      setLoading(false)
+    }
+  }
 
-      navigate('/upload-cv')
-    }, 400)
+  function fillAdminDemo() {
+    setEmail(DEMO_ADMIN.email)
+    setPassword(DEMO_ADMIN.password)
+    setErrors({})
+    setFormError('')
   }
 
   return (
@@ -88,11 +97,15 @@ export default function Login() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {/* ── form-level error ─────────────────────────────── */}
             {formError && (
-              <div className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-error/5 border border-error/20 px-3.5 py-2.5 text-sm text-error animate-fade-in">
-                <span className="shrink-0 mt-0.5">⚠</span>
-                <div>
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-[var(--radius-sm)] bg-error-soft border border-error/20 px-3.5 py-2.5 text-sm text-error animate-fade-in"
+              >
+                <span className="shrink-0 mt-0.5" aria-hidden="true">
+                  ⚠
+                </span>
+                <div className="flex-1">
                   <span>{formError}</span>
                   <button
                     type="button"
@@ -100,7 +113,7 @@ export default function Login() {
                       setFormError('')
                       setPassword('')
                     }}
-                    className="block mt-1 text-xs font-medium text-error underline underline-offset-2 hover:no-underline cursor-pointer"
+                    className="block mt-1 text-xs font-medium underline underline-offset-2 hover:no-underline cursor-pointer"
                   >
                     Try again
                   </button>
@@ -116,7 +129,7 @@ export default function Login() {
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value)
-                if (errors.email) setErrors((p) => ({ ...p, email: undefined }))
+                clearFieldError('email')
                 if (formError) setFormError('')
               }}
               error={errors.email}
@@ -131,8 +144,7 @@ export default function Login() {
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value)
-                if (errors.password)
-                  setErrors((p) => ({ ...p, password: undefined }))
+                clearFieldError('password')
                 if (formError) setFormError('')
               }}
               error={errors.password}
@@ -147,6 +159,22 @@ export default function Login() {
             >
               {loading ? 'Signing in…' : 'Sign In'}
             </Button>
+
+            <div className="rounded-[var(--radius-sm)] border border-dashed border-border bg-surface px-3.5 py-2.5 text-xs text-foreground-muted flex items-center justify-between gap-3">
+              <span>
+                Admin demo:{' '}
+                <span className="font-mono text-foreground-subtle">
+                  {DEMO_ADMIN.email}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={fillAdminDemo}
+                className="shrink-0 font-medium text-accent hover:text-accent-hover underline underline-offset-2 cursor-pointer"
+              >
+                Use
+              </button>
+            </div>
           </CardContent>
 
           <CardFooter className="justify-center">
@@ -154,6 +182,11 @@ export default function Login() {
               Don&apos;t have an account?{' '}
               <NavLink
                 to="/register"
+                state={
+                  (location.state as NavigationState | null)?.from
+                    ? { from: (location.state as NavigationState).from }
+                    : undefined
+                }
                 className="text-accent hover:text-accent-hover font-medium"
               >
                 Register

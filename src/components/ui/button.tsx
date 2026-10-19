@@ -27,13 +27,22 @@ const buttonVariants = cva(
           'border border-border',
           'hover:bg-accent-light hover:border-accent/30 hover:text-accent',
         ].join(' '),
+        outline: [
+          'border border-border bg-transparent text-foreground',
+          'hover:bg-accent-light hover:border-accent/30 hover:text-accent',
+        ].join(' '),
         ghost: [
           'text-foreground-muted',
           'hover:bg-accent-light hover:text-accent',
         ].join(' '),
         danger: [
-          'bg-error text-white',
-          'hover:bg-red-700',
+          'bg-danger text-white',
+          'hover:bg-danger-hover',
+          'shadow-sm',
+        ].join(' '),
+        destructive: [
+          'bg-danger text-white',
+          'hover:bg-danger-hover',
           'shadow-sm',
         ].join(' '),
       },

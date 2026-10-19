@@ -11,6 +11,7 @@ import {
   Loader2,
   ShieldCheck,
   AlertTriangle,
+  Save,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -163,6 +164,23 @@ export default function PreCheck() {
     navigate('/interview')
   }
 
+  /* ── save progress and exit the flow ─────────────────────────── */
+
+  function handleSaveAndExit() {
+    // Persist that this session is saved so the candidate can resume later.
+    const stored = localStorage.getItem('interviewly_setup')
+    const setup = stored ? (JSON.parse(stored) as Record<string, unknown>) : {}
+    localStorage.setItem(
+      'interviewly_setup',
+      JSON.stringify({ ...setup, deferred: true, savedAt: Date.now() })
+    )
+    // Release the camera before leaving.
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop())
+    }
+    navigate('/')
+  }
+
   /* ── build check rows array ──────────────────────────────────── */
 
   const checks: DeviceCheck[] = [
@@ -232,11 +250,10 @@ export default function PreCheck() {
     <div className="max-w-3xl mx-auto px-6 py-12 space-y-8 animate-fade-in">
       {/* Header */}
       <div className="space-y-3">
-        <h1 className="text-2xl font-bold text-foreground">
-          Pre-Interview Check
-        </h1>
+        <h1 className="text-2xl font-bold text-foreground">Ready to start?</h1>
         <p className="text-foreground-muted">
-          Let's make sure your devices are ready before we begin.
+          Check your camera and microphone, review the rules, then start when
+          you're ready.
         </p>
 
         {/* Progress summary */}
@@ -415,35 +432,46 @@ export default function PreCheck() {
         </ul>
       </div>
 
-      {/* ── Begin Button ───────────────────────────────────────── */}
+      {/* ── Actions: Save and exit / Start ──────────────────────── */}
       <div
         className="flex flex-col items-center gap-3 animate-slide-up"
         style={{ animationDelay: '180ms' }}
       >
-        <Button
-          id="precheck-begin"
-          variant="primary"
-          size="lg"
-          disabled={!allPassed}
-          onClick={handleBegin}
-          className={allPassed ? '' : 'opacity-50 cursor-not-allowed'}
-        >
-          {allPassed ? (
-            <>
-              Begin Interview <ArrowRight className="h-4 w-4" />
-            </>
-          ) : anyFailed ? (
-            <>
-              <AlertTriangle className="h-4 w-4" />
-              Fix issues to continue
-            </>
-          ) : (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Running checks…
-            </>
-          )}
-        </Button>
+        <div className="flex items-center justify-center gap-3">
+          <Button
+            id="precheck-save-exit"
+            variant="secondary"
+            size="lg"
+            onClick={handleSaveAndExit}
+          >
+            <Save className="h-4 w-4" /> Save and exit
+          </Button>
+
+          <Button
+            id="precheck-begin"
+            variant="primary"
+            size="lg"
+            disabled={!allPassed}
+            onClick={handleBegin}
+            className={allPassed ? '' : 'opacity-50 cursor-not-allowed'}
+          >
+            {allPassed ? (
+              <>
+                Start interview <ArrowRight className="h-4 w-4" />
+              </>
+            ) : anyFailed ? (
+              <>
+                <AlertTriangle className="h-4 w-4" />
+                Fix issues to continue
+              </>
+            ) : (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Running checks…
+              </>
+            )}
+          </Button>
+        </div>
 
         {allPassed && (
           <p className="text-xs text-success flex items-center gap-1.5">

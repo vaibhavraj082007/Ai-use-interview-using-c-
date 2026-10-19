@@ -1,6 +1,9 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Sparkles, User, LogOut } from 'lucide-react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Sparkles, LogOut, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { useAuth } from '@/features/auth/auth-context'
+import { Button } from '@/components/ui/button'
 
 const navLinks = [
   { to: '/', label: 'Home' },
@@ -8,12 +11,22 @@ const navLinks = [
   { to: '/setup', label: 'Setup' },
   { to: '/interview', label: 'Interview' },
   { to: '/result', label: 'Result' },
+  { to: '/history', label: 'History' },
 ]
 
 export default function CandidateLayout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
+
   const isAuthPage =
     location.pathname === '/login' || location.pathname === '/register'
+  const ownsFooter = location.pathname === '/'
+
+  async function handleSignOut() {
+    await logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
@@ -28,8 +41,8 @@ export default function CandidateLayout() {
             </span>
           </NavLink>
 
-          {/* Center links — hidden on auth pages */}
-          {!isAuthPage && (
+          {/* Center links — only when signed in */}
+          {user && (
             <div className="hidden md:flex items-center gap-1">
               {navLinks.map((link) => (
                 <NavLink
@@ -53,37 +66,58 @@ export default function CandidateLayout() {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
-            {isAuthPage ? (
-              <NavLink
-                to={location.pathname === '/login' ? '/register' : '/login'}
-                className="text-sm text-accent hover:text-accent-hover font-medium transition-colors duration-150"
-              >
-                {location.pathname === '/login' ? 'Register' : 'Sign in'}
-              </NavLink>
-            ) : (
+            <ThemeToggle />
+
+            {user ? (
               <>
-                <NavLink
-                  to="/admin"
-                  className="text-xs text-foreground-subtle hover:text-foreground-muted px-2 py-1 rounded-[var(--radius-sm)] transition-colors duration-150"
-                >
-                  Admin
-                </NavLink>
+                {user.role === 'admin' && (
+                  <NavLink
+                    to="/admin"
+                    className="inline-flex items-center gap-1.5 text-xs text-foreground-subtle hover:text-accent px-2 py-1 rounded-[var(--radius-sm)] transition-colors duration-150"
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Admin
+                  </NavLink>
+                )}
                 <div className="w-px h-5 bg-border mx-1" />
-                <button
-                  className="flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground px-2 py-1.5 rounded-[var(--radius-sm)] transition-colors duration-150 cursor-pointer"
-                  title="Profile"
+                <div
+                  className="flex items-center gap-2"
+                  title={`${user.name} · ${user.role}`}
                 >
                   <div className="h-7 w-7 rounded-full bg-accent-light flex items-center justify-center">
-                    <User className="h-3.5 w-3.5 text-accent" />
+                    <span className="text-xs font-semibold text-accent">
+                      {user.name.charAt(0).toUpperCase()}
+                    </span>
                   </div>
-                </button>
+                  <span className="hidden sm:block text-sm text-foreground-muted max-w-[10rem] truncate">
+                    {user.name}
+                  </span>
+                </div>
                 <button
+                  onClick={handleSignOut}
                   className="text-foreground-subtle hover:text-foreground p-1.5 rounded-[var(--radius-sm)] transition-colors duration-150 cursor-pointer"
                   title="Sign out"
+                  aria-label="Sign out"
                 >
                   <LogOut className="h-4 w-4" />
                 </button>
               </>
+            ) : (
+              !isAuthPage && (
+                <div className="flex items-center gap-2">
+                  <NavLink
+                    to="/login"
+                    className="text-sm text-foreground-muted hover:text-foreground font-medium transition-colors duration-150 px-2"
+                  >
+                    Sign in
+                  </NavLink>
+                  <NavLink to="/register">
+                    <Button variant="primary" size="sm">
+                      Get started
+                    </Button>
+                  </NavLink>
+                </div>
+              )
             )}
           </div>
         </div>
@@ -95,11 +129,13 @@ export default function CandidateLayout() {
       </main>
 
       {/* ── Footer ─────────────────────────────────────────── */}
-      <footer className="border-t border-border">
-        <div className="max-w-6xl mx-auto px-6 py-8 text-center text-sm text-foreground-subtle">
-          Interviewly — AI-powered technical interviews
-        </div>
-      </footer>
+      {!ownsFooter && (
+        <footer className="border-t border-border">
+          <div className="max-w-6xl mx-auto px-6 py-8 text-center text-sm text-foreground-subtle">
+            Interviewly — AI-powered technical interviews
+          </div>
+        </footer>
+      )}
     </div>
   )
 }

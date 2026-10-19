@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  // SQLite has no enums; validated at the app layer.
+  role         String   @default("candidate")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  reports      Report[]
+  seen         SeenQuestion[]
+
+  @@map("users")
+}
+
+model SeenQuestion {
+  id           String   @id @default(cuid())
+  userId       String
+  /** SHA-256 of the normalised question text — stable across sessions. */
+  questionHash String
+  seenAt       DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@unique([userId, questionHash])
+  @@index([userId])
+  @@map("seen_questions")
+}
+
+model Report {
+  id           String   @id @default(cuid())
+  userId       String?
+  candidateName String
+  candidateEmail String?
+  role         String
+  resultJson   String // JSON string of GradingResult
+  eventsJson   String   @default("[]") // JSON string of proctor events
+  gradedAt     DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("reports")
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String // JSON string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}

@@ -1,48 +1,143 @@
 @import 'tailwindcss';
 
+/* ── Dark mode strategy: class-based (.dark on <html>) ─────────── */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Design Tokens ─────────────────────────────────────────────── */
 
-@theme {
+/* Light theme (default) */
+:root {
+  color-scheme: light;
+
   /* Surface */
-  --color-surface: #FAFAFA;
-  --color-surface-raised: #FFFFFF;
-  --color-surface-overlay: #FFFFFF;
+  --surface: #fafafa;
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
 
   /* Text */
-  --color-foreground: #111111;
-  --color-foreground-muted: #6B7280;
-  --color-foreground-subtle: #9CA3AF;
+  --foreground: #111111;
+  --foreground-muted: #6b7280;
+  --foreground-subtle: #9ca3af;
 
   /* Accent – indigo */
-  --color-accent: #4F46E5;
-  --color-accent-hover: #4338CA;
-  --color-accent-light: #EEF2FF;
-  --color-accent-foreground: #FFFFFF;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-light: #eef2ff;
+  --accent-foreground: #ffffff;
 
   /* Border */
-  --color-border: #E5E7EB;
-  --color-border-focus: #4F46E5;
+  --border: #e5e7eb;
+  --border-focus: #4f46e5;
 
   /* Feedback */
-  --color-success: #059669;
-  --color-warning: #D97706;
-  --color-error: #DC2626;
+  --success: #059669;
+  --warning: #d97706;
+  --error: #dc2626;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+
+  --success-soft: #ecfdf5;
+  --warning-soft: #fffbeb;
+  --error-soft: #fef2f2;
+
+  /* Elevation */
+  --elevation-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --elevation-md: 0 4px 12px -2px rgb(0 0 0 / 0.08);
+  --elevation-lg: 0 18px 40px -16px rgb(0 0 0 / 0.18);
+}
+
+/* Dark theme */
+.dark {
+  color-scheme: dark;
+
+  /* Surface */
+  --surface: #09090b;
+  --surface-raised: #141417;
+  --surface-overlay: #1b1b20;
+
+  /* Text */
+  --foreground: #fafafa;
+  --foreground-muted: #a1a1aa;
+  --foreground-subtle: #71717a;
+
+  /* Accent – indigo (brighter for dark surfaces) */
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-light: #1e1b4b;
+  --accent-foreground: #ffffff;
+
+  /* Border */
+  --border: #27272a;
+  --border-focus: #6366f1;
+
+  /* Feedback */
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --danger: #dc2626;
+  --danger-hover: #ef4444;
+
+  --success-soft: #052e1a;
+  --warning-soft: #33230a;
+  --error-soft: #3a1414;
+
+  /* Elevation */
+  --elevation-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --elevation-md: 0 4px 14px -2px rgb(0 0 0 / 0.6);
+  --elevation-lg: 0 24px 50px -16px rgb(0 0 0 / 0.7);
+}
+
+/* ── Map tokens to Tailwind theme (utilities) ──────────────────── */
+
+@theme inline {
+  /* Surface */
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+
+  /* Text */
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-foreground-subtle: var(--foreground-subtle);
+
+  /* Accent */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-light: var(--accent-light);
+  --color-accent-foreground: var(--accent-foreground);
+
+  /* Border */
+  --color-border: var(--border);
+  --color-border-focus: var(--border-focus);
+
+  /* Feedback */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-success-soft: var(--success-soft);
+  --color-warning-soft: var(--warning-soft);
+  --color-error-soft: var(--error-soft);
+
+  /* Elevation */
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
 
   /* Radius */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-full: 9999px;
 
-  /* Shadows – intentionally very subtle */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.03);
-  --shadow-md: 0 2px 6px -1px rgb(0 0 0 / 0.05);
+  /* Type */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
-  /* Transition */
+  /* Motion */
   --ease-out-smooth: cubic-bezier(0.22, 1, 0.36, 1);
-
-  /* Font */
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ── Global Reset / Base ───────────────────────────────────────── */
@@ -63,6 +158,9 @@ body {
   background-color: var(--color-surface);
   color: var(--color-foreground);
   line-height: 1.6;
+  transition:
+    background-color 0.25s var(--ease-out-smooth),
+    color 0.25s var(--ease-out-smooth);
 }
 
 /* Focus ring – consistent across all interactive elements */
@@ -71,7 +169,7 @@ body {
   outline-offset: 2px;
 }
 
-/* ── Utility Classes ───────────────────────────────────────────── */
+/* ── Utilities ─────────────────────────────────────────────────── */
 
 @utility animate-fade-in {
   animation: fade-in 0.3s var(--ease-out-smooth) both;
@@ -83,6 +181,22 @@ body {
 
 @utility animate-scale-in {
   animation: scale-in 0.2s var(--ease-out-smooth) both;
+}
+
+@utility animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+@utility animate-progress-sweep {
+  animation: progress-sweep 1.8s ease-in-out infinite;
+}
+
+@utility animate-toast-in {
+  animation: toast-in 0.28s var(--ease-out-smooth) both;
+}
+
+@utility animate-toast-out {
+  animation: toast-out 0.2s ease-in both;
 }
 
 /* ── Keyframes ─────────────────────────────────────────────────── */
@@ -119,19 +233,42 @@ body {
 }
 
 @keyframes pulse-soft {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
 
 @keyframes progress-sweep {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(250%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
 }
 
-@utility animate-pulse-soft {
-  animation: pulse-soft 2s ease-in-out infinite;
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(100% + 1.5rem));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
-@utility animate-progress-sweep {
-  animation: progress-sweep 1.8s ease-in-out infinite;
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(calc(100% + 1.5rem));
+  }
 }

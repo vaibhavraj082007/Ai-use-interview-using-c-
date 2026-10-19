@@ -13,9 +13,9 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: 'bg-accent-light text-accent',
-        success: 'bg-emerald-50 text-success',
-        warning: 'bg-amber-50 text-warning',
-        error: 'bg-red-50 text-error',
+        success: 'bg-success-soft text-success',
+        warning: 'bg-warning-soft text-warning',
+        error: 'bg-error-soft text-error',
         outline: 'border border-border text-foreground-muted',
       },
       size: {
